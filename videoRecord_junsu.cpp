@@ -18,6 +18,8 @@
 #include <sys/vfs.h>
 // 메시지큐와 관련된 헤더
 #include <sys/msg.h>
+// wait을 위한 헤더
+#include <wait.h>
 // c++과 opencv에 관련된 
 // 자동으로 코드의 앞에 cv,std를 붙여주는 코드
 using namespace cv;
@@ -283,6 +285,7 @@ int main(void)
 
     else if (pid1 == 0)
     {
+        sleep(1);
         printf("자식1\n");
         printf("일반 로그 기록\n");
         // 전달하는 구조체 선언
@@ -347,6 +350,7 @@ int main(void)
 
     else if (pid2 == 0)
     {
+        sleep(2);
         perror("자식2\n");
         exit(0);
     }
@@ -572,5 +576,6 @@ int main(void)
         // log fd 닫음
         close(fd);
     }
+    wait(&status);
     return 0;
 }
