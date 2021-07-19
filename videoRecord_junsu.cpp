@@ -251,220 +251,254 @@ int main(void)
     // 로그에 추가하는 파일이름 배열
     char logFileName[100];
 
-    // 로그파일을 기록하기 위해 파일열기
-    // open은 파일의 경로,오픈모드,생성파일의 권한을 설정합니다.
-    // 0644는 소유자가 읽기/쓰기 가능, 나머지는 읽기만 가능
-    // WR=쓰기전용모드,CR=필요한경우파일생성,
-    // TR=열었을때 이미 있는파일이고 쓰기옵션으로 열었다면 내용 모두 지움
-    fd = open("/home/pi/blackBox/boxlog/blackbox.log",O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    getTime(LOG_TIME);
-    sprintf(buff, "%s blackbox log파일 저장을 시작합니다.\n",tBUF);
-    // write성공시 전달한 바이트 수를 반환합니다.
-    // 데이터 전송영역 나타내는 파일 디스크립터
-    // 전송할 데이터 가지는 버퍼
-    // 데이터의 바이트 수
-    WRByte = write(fd, buff, strlen(buff));
+    // 멀티프로세스를 위한 변수선언
+    int pid1;
+    int pid2;
 
-    // (1) 카메라, MicroSD등 필수 디바이스들이 
-    //     정상적으로 인식되는지 확인한다.
-    printf("-------디바이스들의 목록-------\n");
-    system("lsusb");
-    printf("\n");
+    // 프로세스 나눔
+    pid1 = fork();
+    pid2 = fork();
+    if (pid1 == -1)
+    {
+        perror("fork error");
+        exit(0);
+    }
     
-    //  [1] VideoCapture("동영상파일의 경로")
-    //      VideoCapture(0)
-    //      videocapture 클래스 선언 cap이라는
-    //      변수로 만든다
-
-    //      Videocapture 클래스 객체는, 카메라
-    //      또는 동영상 파일로부터 정지영상프레임을
-    //      가져옵니다
-
-    //      VideoWriter 클래스는 동영상 파일을 생성하고
-    //      프레임을 저장하기 위해서 사용합니다.
-
-    VideoCapture cap;
-    VideoWriter writer;
-
-    //  [2] 카메라 장치를 엽니다.
-    //      디바이스 0번째를
-    //      리눅스에서
-    cap.open(deviceID, apiID);
-
-    //  [3] 오류:카메라 열지 못하는 경우
-    if (!cap.isOpened()) {
-        perror("ERROR! Unable to open camera\n");
-        return -1;
+    else if (pid2 == -1)
+    {
+        perror("fork error");
+        exit(0);
     }
 
-    //  [4] 라즈베리파이 카메라의 해상도를 변경 
-    cap.set(CAP_PROP_FRAME_WIDTH, 320);
-    cap.set(CAP_PROP_FRAME_HEIGHT, 240);
-    cap.set(CAP_PROP_FPS,30);
-
-    //  [5] Video Recording
-    //      현재 카메라에서 초당 몇 프레임으로 출력하고 있는가?
-    float videoFPS = cap.get(CAP_PROP_FPS); //초당 프레임
-    int videoWidth = cap.get(CAP_PROP_FRAME_WIDTH); //가로 크기
-    int videoHeight = cap.get(CAP_PROP_FRAME_HEIGHT); //세로 크기
-
-    //  [6] 초당프레임과 가로,세로 크기
-    //      출력해서 확인함
-    printf("videoFPS=%f\n",videoFPS);
-    printf("width=%d, height=%d\n",videoWidth, videoHeight);
-    printf("\n");
-
-    while(1)    //계속 반복합니다.
+    else if (pid1 == 0)
     {
-        //  (2) 현재 시간으로된 폴더를 생성합니다.
-        // getTime 함수로 tBUF를 받습니다.
-        getTime(FOLDER_NAME);
-        // log 추가를 위해 값 복사
-        sprintf(logFolderName,"%s",tBUF);
-        // sprintf는 출력하는 결과 값을 변수에 저장하게 해줍니다.
-        // getTime에서의 tBUF값을 가운데 인자에 추가하여
-        // dirname에 저장합니다.
-        sprintf(dirname, "/home/pi/blackBox/data/%s",tBUF);
-        
-        mkdir(dirname,0755);
+        perror("자식1\n");
+        exit(0);
 
+        // 로그파일을 기록하기 위해 파일열기
+        // open은 파일의 경로,오픈모드,생성파일의 권한을 설정합니다.
+        // 0644는 소유자가 읽기/쓰기 가능, 나머지는 읽기만 가능
+        // WR=쓰기전용모드,CR=필요한경우파일생성,
+        // TR=열었을때 이미 있는파일이고 쓰기옵션으로 열었다면 내용 모두 지움
+        fd = open("/home/pi/blackBox/boxlog/blackbox.log", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        getTime(LOG_TIME);
+        sprintf(buff, "%s blackbox log파일 저장을 시작합니다.\n", tBUF);
+        // write성공시 전달한 바이트 수를 반환합니다.
+        // 데이터 전송영역 나타내는 파일 디스크립터
+        // 전송할 데이터 가지는 버퍼
+        // 데이터의 바이트 수
+        WRByte = write(fd, buff, strlen(buff));
+        
         // 폴더생성시 로그파일에 내용추가
         getTime(LOG_TIME);
         sprintf(buff, "%s%s 이름으로 폴더를 생성합니다.\n",tBUF,logFileName);
         // fd는 생성할때 log파일 경로로 지정했음
         write(fd, buff, strlen(buff));
 
-        //  (3) 녹화를 시작하기전에 디스크용량을 확인한다.
-        //      용량이 부족할경우 blackBox폴더의 하위 디렉토리중
-        //      가장 오래된 폴더를 삭제한다. 
-
-        // diskratio인자에 함수반환값 대입 
-        diskratio = getRatio();
-        printf("현재사용가능용량은 [%f%] 입니다.\n");
-
-        // 사용가능용량이 (30)%미만이면 오래된폴더를 삭제한다.
-        if(diskratio<30.0)
-        {
-            // 삭제에 들어간다 알림
-            printf("용량이 부족하므로 오래된 폴더를 삭제합니다.\n");
-            // 오래된폴더이름을 받는다.
-            searchResult = searchOldFolder();
-            // 문자열로 변환한다.
-            sprintf(foldername,"%d",searchResult);
-            // 잘나오나 체크
-            printf("가장오래된 폴더는 %s 입니다.\n",foldername);
-            // 삭제하기위해 폴더주소와 합치고 
-            // 다시 del변수에 대입한다.
-            sprintf(delFoldername,"/home/pi/blackBox/data/%s",foldername);
-
-            // 폴더를 삭제
-            rmdirs(delFoldername);
-        } 
-
-        //  (4) 현재 시간으로된 녹화파일을 생성한다.
-
-        // 시간정보를 읽어와서 파일명을 생성
-        getTime(TIME_FILENAME);
-        printf("FILENAME:%s\n",tBUF);
-        // 로그를 위해 파일명 복사
-        sprintf(logFileName, "%s",tBUF);
-        // 이름과 경로를 합쳐 filePath에 넣는다.
-        sprintf(filePath, "%s/%s",dirname,tBUF);
-        // 파일이 만들어지는 부분 두줄짜리 코드로
-        // 위에서 사용한 opencv의 videoWriter클래스를 사용합니다.
-        // 총 다섯가지 인자를 받습니다.
-        // 1. 저장할 동영상 파일이름
-        // 2. 동영상 압축 코덱을 표현하는 4-문자코드
-        // 3. 저장할 동영상의 초당 프레임 수
-        // 4. 동영상 프레임의 가로 및 세로 크기
-        // 5. 컬러인지 흑백인지(컬러면true,흑백이면false)
-        
-        // 코덱이란 코더-디코더의 약자로써 압축되지 않은 영상은
-        // 크기가 매우 크기에 이 코덱을 사용하여 
-        // 압축(인코딩)하고 압축해제(디코딩)하여
-        // 영상을 봅니다. 이때 회사마다 만드는 코덱형식이 달라
-        // 우리는 영상에 맞는 적절한 코덱을 사용하게 됩니다.
-        writer.open(filePath, VideoWriter::fourcc('D','I','V','X'),
-        videoFPS, Size(videoWidth, videoHeight), true);
-        
         // 파일생성시 로그파일에 내용추가
         getTime(LOG_TIME);
         sprintf(buff, "%s     %s 이름으로 녹화를 시작합니다.\n",tBUF,logFileName);
         // fd는 생성할때 log파일 경로로 지정했음
         write(fd, buff, strlen(buff));
+    }
 
-        //  [7] 동영상파일을 읽을 수 없는 오류
-        if (!writer.isOpened())
+    else if (pid2 == 0)
+    {
+        perror("자식2\n");
+        exit(0);
+    }
+
+    else if ((pid1 && pid2)>0)
+    {
+        // (1) 카메라, MicroSD등 필수 디바이스들이
+        //     정상적으로 인식되는지 확인한다.
+        printf("-------디바이스들의 목록-------\n");
+        system("lsusb");
+        printf("\n");
+
+        //  [1] VideoCapture("동영상파일의 경로")
+        //      VideoCapture(0)
+        //      videocapture 클래스 선언 cap이라는
+        //      변수로 만든다
+
+        //      Videocapture 클래스 객체는, 카메라
+        //      또는 동영상 파일로부터 정지영상프레임을
+        //      가져옵니다
+
+        //      VideoWriter 클래스는 동영상 파일을 생성하고
+        //      프레임을 저장하기 위해서 사용합니다.
+
+        VideoCapture cap;
+        VideoWriter writer;
+
+        //  [2] 카메라 장치를 엽니다.
+        //      디바이스 0번째를
+        //      리눅스에서
+        cap.open(deviceID, apiID);
+
+        //  [3] 오류:카메라 열지 못하는 경우
+        if (!cap.isOpened())
         {
-            perror("Can't write video");
+            perror("ERROR! Unable to open camera\n");
             return -1;
         }
-        frameCount =0;
-        //  [8] 인자 두개의 함수인데
-        //      하나만 입력했으므로
-        //      영상에맞추어 창을 생성
-        //      창의 이름은 위에 디파인했음
-        //      VIDEO_WINDOW_NAME = record
-        namedWindow(VIDEO_WINDOW_NAME);
 
-        //  [9] 프레임을 0에서 maxframe 1780
-        //      까지 이미지를 읽음
-        while(frameCount<MaxFrame)
+        //  [4] 라즈베리파이 카메라의 해상도를 변경
+        cap.set(CAP_PROP_FRAME_WIDTH, 320);
+        cap.set(CAP_PROP_FRAME_HEIGHT, 240);
+        cap.set(CAP_PROP_FPS, 30);
+
+        //  [5] Video Recording
+        //      현재 카메라에서 초당 몇 프레임으로 출력하고 있는가?
+        float videoFPS = cap.get(CAP_PROP_FPS);           //초당 프레임
+        int videoWidth = cap.get(CAP_PROP_FRAME_WIDTH);   //가로 크기
+        int videoHeight = cap.get(CAP_PROP_FRAME_HEIGHT); //세로 크기
+
+        //  [6] 초당프레임과 가로,세로 크기
+        //      출력해서 확인함
+        printf("videoFPS=%f\n", videoFPS);
+        printf("width=%d, height=%d\n", videoWidth, videoHeight);
+        printf("\n");
+
+        while (1) //계속 반복합니다.
         {
-            //  [10] 카메라에서 매 프레임(mat타입)
-            //       마다 이미지 읽기
-            cap.read(frame);
-            frameCount++;
-            //  [11] 카메라가 갑자기 빠지는 등의 오류 확인
-            if (frame.empty()) {
-                perror("ERROR! blank frame grabbed\n");
-                break;
-            }
+            //  (2) 현재 시간으로된 폴더를 생성합니다.
+            // getTime 함수로 tBUF를 받습니다.
+            getTime(FOLDER_NAME);
+            // log 추가를 위해 값 복사
+            sprintf(logFolderName, "%s", tBUF);
+            // sprintf는 출력하는 결과 값을 변수에 저장하게 해줍니다.
+            // getTime에서의 tBUF값을 가운데 인자에 추가하여
+            // dirname에 저장합니다.
+            sprintf(dirname, "/home/pi/blackBox/data/%s", tBUF);
 
-            //  [12] 읽어온 한 장의 프레임을 writer에 쓰기
-            //       writer는 클래스이다. 
-            //       <<연산자를 통해 frame(mat형식)이 
-            //       writer에 들어간다. 
-            writer << frame; // test.avi
+            mkdir(dirname, 0755);
 
-            //  [13] imshow(),이미지 창 이름, 파일 명을
-            //       입력받아 이미지를 모니터에 보여줍니다.
-            //       창이름은 디파인된 record, frame은
-            //       말그대로 mat형식의 파일입니다.
-            imshow(VIDEO_WINDOW_NAME, frame);
+            //  (3) 녹화를 시작하기전에 디스크용량을 확인한다.
+            //      용량이 부족할경우 blackBox폴더의 하위 디렉토리중
+            //      가장 오래된 폴더를 삭제한다.
 
-            //  [14] ESC=>27 'ESC' 키가 입력되면 종료 
-            //       waitkey는 인자값으로 ms단위의 시간을
-            //       입력받는데 여기서는 1000/30입니다
-            //       이는 0.033초만 대기한다는 뜻인데
-            //       우리가 프레임을 1초당 30프레임으로 
-            //       설정했으므로 0.03초당 1프레임이므로
-            //       정리하자면 이 함수는 딱 1프레임을 최대한
-            //       맞추어 시간의 손실없이 기다리겠다는 뜻이며
-            //       이 함수는 입력값을 출력하기 때문에 
-            //       esc키(ascii_27)을 받으면 프린트문과 함께
-            //       반복문을 빠져 나갑니다.
-            if(waitKey(1000/videoFPS)==27)
+            // diskratio인자에 함수반환값 대입
+            diskratio = getRatio();
+            printf("현재사용가능용량은 [%f%] 입니다.\n");
+
+            // 사용가능용량이 (30)%미만이면 오래된폴더를 삭제한다.
+            if (diskratio < 30.0)
             {
-                printf("Stop video record\n");
-                exitFlag = 1;  //flag는 나중에 다시 사용합니다.
-                break;
+                // 삭제에 들어간다 알림
+                printf("용량이 부족하므로 오래된 폴더를 삭제합니다.\n");
+                // 오래된폴더이름을 받는다.
+                searchResult = searchOldFolder();
+                // 문자열로 변환한다.
+                sprintf(foldername, "%d", searchResult);
+                // 잘나오나 체크
+                printf("가장오래된 폴더는 %s 입니다.\n", foldername);
+                // 삭제하기위해 폴더주소와 합치고
+                // 다시 del변수에 대입한다.
+                sprintf(delFoldername, "/home/pi/blackBox/data/%s", foldername);
+
+                // 폴더를 삭제
+                rmdirs(delFoldername);
             }
 
-        }
-        //  [15] 먼저 writer클래스를 해제(release) 합니다.
-        //       다음 esc의 flag를 이용해 반복문을 나갑니다. 
-        writer.release();
-        if(exitFlag==1)
-            break;
-    }
-    //  [16] 다음 cap클래스를 해제 합니다.
-    //       그 후 destroy함수를 통해 VIDEO_WINDOW_NAME(def:record)창을
-    //       파괴합니다.
-    cap.release();
-    destroyWindow(VIDEO_WINDOW_NAME);
-    // log fd 닫음
-    close(fd);
+            //  (4) 현재 시간으로된 녹화파일을 생성한다.
 
+            // 시간정보를 읽어와서 파일명을 생성
+            getTime(TIME_FILENAME);
+            printf("FILENAME:%s\n", tBUF);
+            // 로그를 위해 파일명 복사
+            sprintf(logFileName, "%s", tBUF);
+            // 이름과 경로를 합쳐 filePath에 넣는다.
+            sprintf(filePath, "%s/%s", dirname, tBUF);
+            // 파일이 만들어지는 부분 두줄짜리 코드로
+            // 위에서 사용한 opencv의 videoWriter클래스를 사용합니다.
+            // 총 다섯가지 인자를 받습니다.
+            // 1. 저장할 동영상 파일이름
+            // 2. 동영상 압축 코덱을 표현하는 4-문자코드
+            // 3. 저장할 동영상의 초당 프레임 수
+            // 4. 동영상 프레임의 가로 및 세로 크기
+            // 5. 컬러인지 흑백인지(컬러면true,흑백이면false)
+
+            // 코덱이란 코더-디코더의 약자로써 압축되지 않은 영상은
+            // 크기가 매우 크기에 이 코덱을 사용하여
+            // 압축(인코딩)하고 압축해제(디코딩)하여
+            // 영상을 봅니다. 이때 회사마다 만드는 코덱형식이 달라
+            // 우리는 영상에 맞는 적절한 코덱을 사용하게 됩니다.
+            writer.open(filePath, VideoWriter::fourcc('D', 'I', 'V', 'X'),
+                        videoFPS, Size(videoWidth, videoHeight), true);
+
+            //  [7] 동영상파일을 읽을 수 없는 오류
+            if (!writer.isOpened())
+            {
+                perror("Can't write video");
+                return -1;
+            }
+            frameCount = 0;
+            //  [8] 인자 두개의 함수인데
+            //      하나만 입력했으므로
+            //      영상에맞추어 창을 생성
+            //      창의 이름은 위에 디파인했음
+            //      VIDEO_WINDOW_NAME = record
+            namedWindow(VIDEO_WINDOW_NAME);
+
+            //  [9] 프레임을 0에서 maxframe 1780
+            //      까지 이미지를 읽음
+            while (frameCount < MaxFrame)
+            {
+                //  [10] 카메라에서 매 프레임(mat타입)
+                //       마다 이미지 읽기
+                cap.read(frame);
+                frameCount++;
+                //  [11] 카메라가 갑자기 빠지는 등의 오류 확인
+                if (frame.empty())
+                {
+                    perror("ERROR! blank frame grabbed\n");
+                    break;
+                }
+
+                //  [12] 읽어온 한 장의 프레임을 writer에 쓰기
+                //       writer는 클래스이다.
+                //       <<연산자를 통해 frame(mat형식)이
+                //       writer에 들어간다.
+                writer << frame; // test.avi
+
+                //  [13] imshow(),이미지 창 이름, 파일 명을
+                //       입력받아 이미지를 모니터에 보여줍니다.
+                //       창이름은 디파인된 record, frame은
+                //       말그대로 mat형식의 파일입니다.
+                imshow(VIDEO_WINDOW_NAME, frame);
+
+                //  [14] ESC=>27 'ESC' 키가 입력되면 종료
+                //       waitkey는 인자값으로 ms단위의 시간을
+                //       입력받는데 여기서는 1000/30입니다
+                //       이는 0.033초만 대기한다는 뜻인데
+                //       우리가 프레임을 1초당 30프레임으로
+                //       설정했으므로 0.03초당 1프레임이므로
+                //       정리하자면 이 함수는 딱 1프레임을 최대한
+                //       맞추어 시간의 손실없이 기다리겠다는 뜻이며
+                //       이 함수는 입력값을 출력하기 때문에
+                //       esc키(ascii_27)을 받으면 프린트문과 함께
+                //       반복문을 빠져 나갑니다.
+                if (waitKey(1000 / videoFPS) == 27)
+                {
+                    printf("Stop video record\n");
+                    exitFlag = 1; //flag는 나중에 다시 사용합니다.
+                    break;
+                }
+            }
+            //  [15] 먼저 writer클래스를 해제(release) 합니다.
+            //       다음 esc의 flag를 이용해 반복문을 나갑니다.
+            writer.release();
+            if (exitFlag == 1)
+                break;
+        }
+        //  [16] 다음 cap클래스를 해제 합니다.
+        //       그 후 destroy함수를 통해 VIDEO_WINDOW_NAME(def:record)창을
+        //       파괴합니다.
+        cap.release();
+        destroyWindow(VIDEO_WINDOW_NAME);
+        // log fd 닫음
+        close(fd);
+    }
     return 0;
 }
