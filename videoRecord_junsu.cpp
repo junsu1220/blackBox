@@ -16,6 +16,8 @@
 #include <sys/stat.h>
 #include <libgen.h>
 #include <sys/vfs.h>
+// 메시지큐와 관련된 헤더
+#include <sys/msg.h>
 // c++과 opencv에 관련된 
 // 자동으로 코드의 앞에 cv,std를 붙여주는 코드
 using namespace cv;
@@ -29,11 +31,20 @@ using namespace std;
 #define LOG_TIME      2
 // 폴더가 저장되는 최대 갯수
 #define MAX_LIST 50 
+// 메세지큐의 최대 갯수
+#define MAX_TEXT 64
 
 // 시간이름함수 사용시 출력에 이용하는 버퍼
 char tBUF[100];
 // 오래된 폴더찾는 함수에서 쓰는 경로값
 const char *path = "/home/pi/blackBox/data"; 
+
+// 메시지큐를 위한 전달용 구조체
+struct my_msg_st
+{
+    long int my_msg_type;
+    char some_text[MAX_TEXT];
+};
 
 // 시간으로 된 이름을 만드는 함수
 void getTime(int ret_type)
@@ -272,8 +283,38 @@ int main(void)
 
     else if (pid1 == 0)
     {
-        perror("자식1\n");
-        exit(0);
+        printf("자식1\n");
+        printf("일반 로그 기록\n");
+        // 전달하는 구조체 선언
+        struct my_msg_st some_data;
+        // msg id 받는 변수
+        int msgid;
+        // msg에서 쓰는 버퍼(자식)
+        char buffer[BUFSIZ];
+        // 메시지큐 생성(자식)
+        msgid = msgget((key_t)0x1234, 0666|IPC_CREAT);
+        // 메시지 생성 안되면
+        if(msgid==-1)
+        {
+            fprintf(stderr,"msgget failed\n",errno);
+            exit(EXIT_FAILURE);
+        }
+        // 메시지 받음
+        // 1. 받는 메시지큐 지시번호, 식별자
+        // 2. 받는 데이터
+        // 3. 받는 자료의 크기
+        // 4. 메시지큐에 있는 자료중 어떤자료 읽을지,0이면 첫번째 자료
+        // 5. 읽어 들이는 옵션, 0이면 쓰지 않음
+        msgrcv(msgid, (void*)&some_data, BUFSIZ, 0, 0);
+        printf("%s\n",some_data.some_text);
+
+        // 메시지큐 수신 프로세스에서 메시지큐를 삭제
+        // IPC_RMID가 삭제 명령 이때 버프는 0
+        if (msgctl(msgid, IPC_RMID, 0) == -1)
+        {
+            fprintf(stderr, "msgctl(IPC_RMID) failed:%d\n", errno);
+            exit(EXIT_FAILURE);
+        }
 
         // 로그파일을 기록하기 위해 파일열기
         // open은 파일의 경로,오픈모드,생성파일의 권한을 설정합니다.
@@ -300,6 +341,8 @@ int main(void)
         sprintf(buff, "%s     %s 이름으로 녹화를 시작합니다.\n",tBUF,logFileName);
         // fd는 생성할때 log파일 경로로 지정했음
         write(fd, buff, strlen(buff));
+        
+        exit(0);
     }
 
     else if (pid2 == 0)
@@ -310,6 +353,13 @@ int main(void)
 
     else if ((pid1 && pid2)>0)
     {
+        // 전달하는 구조체 선언
+        struct my_msg_st some_data;
+        // msg id 받는 변수
+        int msgid;
+        // msg에서 쓰는 버퍼(부모)
+        char buffer[BUFSIZ];
+        
         // (1) 카메라, MicroSD등 필수 디바이스들이
         //     정상적으로 인식되는지 확인한다.
         printf("-------디바이스들의 목록-------\n");
@@ -373,6 +423,28 @@ int main(void)
             sprintf(dirname, "/home/pi/blackBox/data/%s", tBUF);
 
             mkdir(dirname, 0755);
+
+            // 메시지큐를 보내기위해 메시지큐 생성
+            // key 다른 메시지와 차별되는 이 메시지의 요소
+            // IPC_CREAT는 메시지큐 생성시 사용
+            msgid = msgget((key_t)0x1234, 0666 | IPC_CREAT);
+            // 오류날 경우
+            if (msgid == -1)
+            {
+                fprintf(stderr, "msgget failed\n", errno);
+                exit(EXIT_FAILURE);
+            }
+            some_data.some_text = "folder_made"
+            // 보내면서 오류날경우도 확인.
+            // 1. msgget 으로 생성된 메시지큐 지시번호
+            // 2. 보내고자 하는 데이터
+            // 3. 보내고자 하는 데이터의 크기
+            // 4. 0이라면 큐의 첫번째 데이터 읽음, 아니라면 가장 오래된 메시지
+            if (msgsnd(msgid, (void *)&some_data, MAX_TEXT, 0) == -1)
+            {
+                fprintf(stderr, "msgsnd failed\n");
+                exit(EXIT_FAILURE);
+            }
 
             //  (3) 녹화를 시작하기전에 디스크용량을 확인한다.
             //      용량이 부족할경우 blackBox폴더의 하위 디렉토리중
