@@ -267,6 +267,11 @@ int main(void)
     // 멀티프로세스를 위한 변수선언
     int pid1;
     int pid2;
+    // msg에서 쓰는 버퍼(자식)
+    char buffer[BUFSIZ];
+    // wait
+    int status;
+    
 
     // 프로세스 나눔
     pid1 = fork();
@@ -292,8 +297,6 @@ int main(void)
         struct my_msg_st some_data;
         // msg id 받는 변수
         int msgid;
-        // msg에서 쓰는 버퍼(자식)
-        char buffer[BUFSIZ];
         // 메시지큐 생성(자식)
         msgid = msgget((key_t)0x1234, 0666|IPC_CREAT);
         // 메시지 생성 안되면
@@ -435,10 +438,11 @@ int main(void)
             // 오류날 경우
             if (msgid == -1)
             {
-                fprintf(stderr, "msgget failed\n", errno);
+                fprintf(stderr, "msgget_failed:%d\n", errno);
                 exit(EXIT_FAILURE);
             }
-            some_data.some_text = "folder_made"
+            //sprintf(buffer, "folder_made%s", buffer);
+            strcpy(some_data.some_text, buffer);
             // 보내면서 오류날경우도 확인.
             // 1. msgget 으로 생성된 메시지큐 지시번호
             // 2. 보내고자 하는 데이터
