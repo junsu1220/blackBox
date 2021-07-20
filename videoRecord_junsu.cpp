@@ -42,10 +42,15 @@ char tBUF[100];
 const char *path = "/home/pi/blackBox/data"; 
 
 // 메시지큐를 위한 전달용 구조체
-struct my_msg_st
+struct real_data
 {
-    long int my_msg_type;
-    char some_text[MAX_TEXT];
+    short back;
+    char sign[16];
+};
+
+struct message{
+        long msg_type;
+        struct real_data data;
 };
 
 // 시간으로 된 이름을 만드는 함수
@@ -265,25 +270,14 @@ int main(void)
     char logFileName[100];
 
     // 멀티프로세스를 위한 변수선언
-    int pid1;
-    int pid2;
+    pid_t pid1;
+    pid_t pid2;
 
     // 프로세스 나눔
     pid1 = fork();
     pid2 = fork();
-    if (pid1 == -1)
-    {
-        perror("fork error");
-        exit(0);
-    }
     
-    else if (pid2 == -1)
-    {
-        perror("fork error");
-        exit(0);
-    }
-
-    else if (pid1 == 0)
+    if (pid1 == 0)
     {
         sleep(1);
         printf("자식1\n");
@@ -348,15 +342,14 @@ int main(void)
         exit(0);
     }
 
-    else if (pid2 == 0)
-    {
-        sleep(2);
-        perror("자식2\n");
-        exit(0);
-    }
+        pid2 = fork();
+        if (pid2 == 0)
+        {
+            sleep(2);
+            perror("자식2\n");
+            exit(0);
+        }
 
-    else if ((pid1 && pid2)>0)
-    {
         // 전달하는 구조체 선언
         struct my_msg_st some_data;
         // msg id 받는 변수
@@ -575,7 +568,6 @@ int main(void)
         destroyWindow(VIDEO_WINDOW_NAME);
         // log fd 닫음
         close(fd);
-    }
-    wait(&status);
+
     return 0;
 }
